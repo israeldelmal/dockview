@@ -33,13 +33,15 @@
     ═══════════════════════════════════════════════════════════════════════ -->
 
     <Style x:Key="IconButtonStyle" TargetType="Button">
-        <Setter Property="Background"   Value="Transparent"/>
-        <Setter Property="BorderBrush"  Value="Transparent"/>
-        <Setter Property="Foreground"   Value="{DynamicResource PrimaryText}"/>
-        <Setter Property="FontFamily"   Value="Segoe UI Variable, Segoe UI, sans-serif"/>
-        <Setter Property="FontSize"     Value="13"/>
-        <Setter Property="Padding"      Value="8,5"/>
-        <Setter Property="Cursor"       Value="Hand"/>
+        <Setter Property="Background"              Value="Transparent"/>
+        <Setter Property="BorderBrush"             Value="Transparent"/>
+        <Setter Property="Foreground"              Value="{DynamicResource PrimaryText}"/>
+        <Setter Property="FontFamily"              Value="Segoe UI Variable, Segoe UI, sans-serif"/>
+        <Setter Property="FontSize"                Value="13"/>
+        <Setter Property="Padding"                 Value="8,5"/>
+        <Setter Property="Cursor"                  Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment"   Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -47,8 +49,9 @@
                             Background="{TemplateBinding Background}"
                             CornerRadius="6"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -242,6 +245,35 @@
         <Setter Property="Width"   Value="1"/>
         <Setter Property="Margin"  Value="8,4"/>
         <Setter Property="Fill"    Value="{DynamicResource BorderBrush}"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         Close button — same as IconButtonStyle but with red hover
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#C42B1C"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#9B2318"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

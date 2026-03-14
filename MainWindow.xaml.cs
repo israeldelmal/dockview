@@ -30,6 +30,9 @@ public partial class MainWindow : Window
 
         _hideTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
         _hideTimer.Tick += (_, _) => SetControlsVisible(false);
+
+        StateChanged += (_, _) =>
+            MaxRestoreButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
     }
 
     // ── Fullscreen toggle ─────────────────────────────────────────────────────
@@ -103,7 +106,7 @@ public partial class MainWindow : Window
         double opacity   = visible ? 1.0 : 0.0;
 
         // Animate opacity for a smooth fade
-        FadeElement(TopBar,       opacity);
+        FadeElement(TopBar,        opacity);
         FadeElement(BottomOverlay, opacity);
 
         Cursor = visible ? Cursors.Arrow : Cursors.None;
@@ -146,6 +149,22 @@ public partial class MainWindow : Window
                 break;
         }
     }
+
+    // ── Caption buttons ───────────────────────────────────────────────────────
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        => SystemCommands.MinimizeWindow(this);
+
+    private void MaxRestoreButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized)
+            SystemCommands.RestoreWindow(this);
+        else
+            SystemCommands.MaximizeWindow(this);
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+        => SystemCommands.CloseWindow(this);
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 

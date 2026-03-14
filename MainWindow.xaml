@@ -21,7 +21,7 @@
         <shell:WindowChrome CaptionHeight="56"
                             ResizeBorderThickness="4"
                             GlassFrameThickness="0"
-                            UseAeroCaptionButtons="True"/>
+                            UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -75,7 +75,7 @@
                 VerticalAlignment="Top"
                 HorizontalAlignment="Stretch"
                 Height="56"
-                Padding="16,0,150,0">
+                Padding="16,0,4,0">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                     <GradientStop Color="#D0000000" Offset="0"/>
@@ -150,30 +150,56 @@
                               DisplayMemberPath="FriendlyName"/>
                 </StackPanel>
 
-                <!-- Action buttons -->
+                <!-- Action buttons + Window caption buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal"
                             VerticalAlignment="Center" Margin="0,0,2,0"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Content="⟳"
                             Style="{StaticResource IconButtonStyle}"
-                            Foreground="White"
+                            Foreground="White" FontSize="16"
+                            Width="32" Height="32" Padding="0"
                             ToolTip="Refresh device list"
                             Command="{Binding RefreshDevicesCommand}"
-                            FontSize="16"
                             Margin="0,0,2,0"/>
                     <Button Content="{Binding PresetLabel}"
                             Style="{StaticResource IconButtonStyle}"
-                            Foreground="White"
+                            Foreground="White" FontSize="15"
+                            Width="32" Height="32" Padding="0"
                             ToolTip="{Binding RenderPreset}"
                             Click="PresetButton_Click"
-                            FontSize="15"
                             Margin="0,0,2,0"/>
                     <Button Content="⛶"
                             Style="{StaticResource IconButtonStyle}"
-                            Foreground="White"
+                            Foreground="White" FontSize="15"
+                            Width="32" Height="32" Padding="0"
                             ToolTip="Toggle fullscreen  (F11)"
-                            Click="FullscreenButton_Click"
-                            FontSize="15"/>
+                            Click="FullscreenButton_Click"/>
+
+                    <Rectangle Width="1" Margin="10,8" Fill="#44FFFFFF"/>
+
+                    <Button x:Name="MinimizeButton"
+                            Style="{StaticResource IconButtonStyle}"
+                            Content="─"
+                            Foreground="White" FontSize="15"
+                            Width="32" Height="32" Padding="0"
+                            ToolTip="Minimizar"
+                            Margin="0,0,2,0"
+                            Click="MinimizeButton_Click"/>
+                    <Button x:Name="MaxRestoreButton"
+                            Style="{StaticResource IconButtonStyle}"
+                            Content="□"
+                            Foreground="White" FontSize="13"
+                            Width="32" Height="32" Padding="0"
+                            ToolTip="Maximizar"
+                            Margin="0,0,2,0"
+                            Click="MaxRestoreButton_Click"/>
+                    <Button x:Name="CloseButton"
+                            Style="{StaticResource CloseButtonStyle}"
+                            Content="✕"
+                            Foreground="White" FontSize="13"
+                            Width="32" Height="32" Padding="0"
+                            ToolTip="Cerrar"
+                            Click="CloseButton_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
