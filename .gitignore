@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+
+# Single-file publish output at project root
+Dockview.exe
+
+# User-specific Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# OS
+Thumbs.db
+.DS_Store
