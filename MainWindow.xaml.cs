@@ -1,6 +1,8 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Dockview.ViewModels;
 
@@ -8,6 +10,18 @@ namespace Dockview;
 
 public partial class MainWindow : Window
 {
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, uint attr, ref uint value, uint size);
+    private const uint DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const uint DWMWCP_DEFAULT    = 0;
+    private const uint DWMWCP_DONOTROUND = 1;
+
+    private void SetWindowCorners(uint preference)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(uint));
+    }
+
     private readonly MainViewModel _vm;
 
     // Auto-hide: hide controls after 3 s of mouse inactivity in fullscreen
@@ -72,6 +86,7 @@ public partial class MainWindow : Window
         Width        = SystemParameters.PrimaryScreenWidth;
         Height       = SystemParameters.PrimaryScreenHeight;
 
+        SetWindowCorners(DWMWCP_DONOTROUND);
         _isFullscreen = true;
         _hideTimer.Start();
         SetControlsVisible(true);
@@ -91,6 +106,7 @@ public partial class MainWindow : Window
         Width        = _savedWidth;
         Height       = _savedHeight;
 
+        SetWindowCorners(DWMWCP_DEFAULT);
         _isFullscreen = false;
     }
 
