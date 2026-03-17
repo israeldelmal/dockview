@@ -290,15 +290,19 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     /// Returns null if no match is found.
     /// </summary>
     private AudioCaptureDevice? MatchAudioToVideo(VideoCaptureDevice? video)
+        => MatchAudioToVideo(video, AudioDevices);
+
+    internal static AudioCaptureDevice? MatchAudioToVideo(
+        VideoCaptureDevice? video, IEnumerable<AudioCaptureDevice> audioDevices)
     {
-        if (video is null || AudioDevices.Count == 0) return null;
+        if (video is null) return null;
 
         var words = video.FriendlyName
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Where(w => w.Length > 3)
             .ToArray();
 
-        return AudioDevices.FirstOrDefault(a =>
+        return audioDevices.FirstOrDefault(a =>
             words.Any(w => a.FriendlyName.Contains(w, StringComparison.OrdinalIgnoreCase)));
     }
 

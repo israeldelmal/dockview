@@ -150,7 +150,7 @@ public sealed class VideoCapture : IDisposable
 
         // 4a. Enumerate all native types and select the best one for the active profile.
         var nativeTypes = EnumerateNativeTypes(reader);
-        var best = SelectBestNativeType(nativeTypes, _profile);
+        var best = StreamSelector.SelectBest(nativeTypes, _profile);
         if (best != null)
         {
             // Re-fetch the actual IMFMediaType pointer for the selected index.
@@ -329,47 +329,6 @@ public sealed class VideoCapture : IDisposable
         }
 
         return result;
-    }
-
-    private static NativeStreamInfo? SelectBestNativeType(
-        IReadOnlyList<NativeStreamInfo> types, CaptureProfile profile)
-    {
-        if (types.Count == 0) return null;
-
-        // Always prefer 1920×1080 @ ≥55fps if available — it's the standard
-        // target for 1080p60 console capture.  Only fall back to other
-        // resolutions when the device doesn't expose that mode at all.
-        var target1080p60 = types
-            .Where(t => t.Width == 1920 && t.Height == 1080 && t.Fps >= 55)
-            .ToList();
-        IReadOnlyList<NativeStreamInfo> pool = target1080p60.Count > 0
-            ? target1080p60
-            : types;
-
-        return profile switch
-        {
-            CaptureProfile.LowLatency =>
-                pool.OrderByDescending(t => t.Fps)
-                    .ThenByDescending(t => (long)t.Width * t.Height)
-                    .First(),
-
-            CaptureProfile.Quality =>
-                PreferUncompressed(pool, t => ((long)t.Width * t.Height, (long)t.Fps)),
-
-            _ => // Balanced
-                PreferUncompressed(pool, t => ((long)t.Width * t.Height * t.Fps, 0L)),
-        };
-    }
-
-    private static NativeStreamInfo PreferUncompressed(
-        IReadOnlyList<NativeStreamInfo> types,
-        Func<NativeStreamInfo, (long primary, long secondary)> order)
-    {
-        var uncompressed = types.Where(t => !t.IsCompressed).ToList();
-        var pool = uncompressed.Count > 0 ? uncompressed : types.ToList();
-        return pool.OrderByDescending(t => order(t).primary)
-                   .ThenByDescending(t => order(t).secondary)
-                   .First();
     }
 
     private static string FormatName(Guid subtype)

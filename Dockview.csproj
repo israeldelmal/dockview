@@ -17,6 +17,11 @@
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- Exclude the test sub-project from the main WPF compilation glob -->
+  <ItemGroup>
+    <Compile Remove="Dockview.Tests\**\*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Low-latency audio capture + playback with WASAPI -->
     <PackageReference Include="NAudio" Version="2.2.1" />
