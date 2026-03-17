@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -25,19 +27,25 @@ public sealed class VideoCapture : IDisposable
     public int FrameWidth  { get; private set; }
     public int FrameHeight { get; private set; }
 
+    /// <summary>The native stream format that was negotiated with the device.</summary>
+    public NativeStreamInfo? ActiveStreamInfo { get; private set; }
+
     // ── Internals ─────────────────────────────────────────────────────────────
 
     private IntPtr         _reader;          // IMFSourceReader* (raw, no RCW)
     private Thread?        _captureThread;
     private volatile bool  _isCapturing;
     private volatile bool  _disposed;
+    private CaptureProfile _profile = CaptureProfile.Balanced;
 
     // ── API ───────────────────────────────────────────────────────────────────
 
-    public void Start(string symbolicLink)
+    public void Start(string symbolicLink, CaptureProfile profile = CaptureProfile.Balanced)
     {
         if (_isCapturing)
             throw new InvalidOperationException("Already capturing.");
+
+        _profile = profile;
 
         // CreateSourceReader and the capture loop both run on the same MTA thread.
         // New threads in .NET are MTA by default — this avoids the STA/MTA
@@ -64,8 +72,9 @@ public sealed class VideoCapture : IDisposable
             _reader = IntPtr.Zero;
         }
 
-        FrameWidth  = 0;
-        FrameHeight = 0;
+        FrameWidth       = 0;
+        FrameHeight      = 0;
+        ActiveStreamInfo = null;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -139,16 +148,21 @@ public sealed class VideoCapture : IDisposable
             out IntPtr reader);
         MFCom.Release(pSource); // SourceReader holds its own ref to the source
 
-        // 4a. Find and select the native 1920×1080 media type so the device
-        //     captures at full HD instead of its default lower resolution.
-        IntPtr native1080 = FindNativeType(reader, 1920, 1080);
-        if (native1080 != IntPtr.Zero)
+        // 4a. Enumerate all native types and select the best one for the active profile.
+        var nativeTypes = EnumerateNativeTypes(reader);
+        var best = SelectBestNativeType(nativeTypes, _profile);
+        if (best != null)
         {
-            // Ignore failure — device may not support 1080p natively but the
-            // video processor can still upscale; we try anyway.
-            MFCom.SourceReader_SetCurrentMediaType(reader, MFGuids.FirstVideoStream,
-                IntPtr.Zero, native1080);
-            MFCom.Release(native1080);
+            // Re-fetch the actual IMFMediaType pointer for the selected index.
+            var hr = MFCom.SourceReader_GetNativeMediaType(
+                reader, MFGuids.FirstVideoStream, best.TypeIndex, out IntPtr pBest);
+            if (hr >= 0 && pBest != IntPtr.Zero)
+            {
+                MFCom.SourceReader_SetCurrentMediaType(reader,
+                    MFGuids.FirstVideoStream, IntPtr.Zero, pBest);
+                MFCom.Release(pBest);
+            }
+            ActiveStreamInfo = best;
         }
 
         // 4b. Request RGB32 output at 1920×1080.
@@ -272,38 +286,105 @@ public sealed class VideoCapture : IDisposable
         }
     }
 
-    /// <summary>
-    /// Iterates the device's native media types and returns the first one whose
-    /// frame size matches <paramref name="width"/>×<paramref name="height"/>.
-    /// The caller is responsible for calling <see cref="MFCom.Release"/> on the
-    /// returned pointer (if non-zero).
-    /// </summary>
-    private static IntPtr FindNativeType(IntPtr reader, int width, int height)
+    // ── Native type enumeration & selection ───────────────────────────────────
+
+    private static List<NativeStreamInfo> EnumerateNativeTypes(IntPtr reader)
     {
         const int MF_E_NO_MORE_TYPES = unchecked((int)0xC00D36B9);
+        var result = new List<NativeStreamInfo>();
 
         for (uint i = 0; ; i++)
         {
             var hr = MFCom.SourceReader_GetNativeMediaType(
                 reader, MFGuids.FirstVideoStream, i, out IntPtr pType);
 
-            if (hr == MF_E_NO_MORE_TYPES || hr < 0)
-                break;
+            if (hr == MF_E_NO_MORE_TYPES || hr < 0) break;
 
-            var sizeKey = MFGuids.MtFrameSize;
-            if (MFCom.GetUINT64(pType, ref sizeKey, out ulong packed) >= 0)
+            try
             {
-                int w = (int)(packed >> 32);
-                int h = (int)(packed & 0xFFFF_FFFF);
-                if (w == width && h == height)
-                    return pType; // caller releases
-            }
+                var subtypeKey = MFGuids.MtSubtype;
+                if (MFCom.GetGUID(pType, ref subtypeKey, out Guid subtype) < 0) continue;
 
-            MFCom.Release(pType);
+                var sizeKey = MFGuids.MtFrameSize;
+                if (MFCom.GetUINT64(pType, ref sizeKey, out ulong sizeVal) < 0) continue;
+                int w = (int)(sizeVal >> 32);
+                int h = (int)(sizeVal & 0xFFFF_FFFF);
+
+                int fps = 30;
+                var rateKey = MFGuids.MtFrameRate;
+                if (MFCom.GetUINT64(pType, ref rateKey, out ulong rateVal) >= 0)
+                {
+                    uint num = (uint)(rateVal >> 32);
+                    uint den = (uint)(rateVal & 0xFFFFFFFF);
+                    if (den > 0) fps = (int)Math.Round((double)num / den);
+                }
+
+                result.Add(new NativeStreamInfo(
+                    i, subtype, FormatName(subtype), w, h, fps, IsCompressedFormat(subtype)));
+            }
+            finally
+            {
+                MFCom.Release(pType);
+            }
         }
 
-        return IntPtr.Zero;
+        return result;
     }
+
+    private static NativeStreamInfo? SelectBestNativeType(
+        IReadOnlyList<NativeStreamInfo> types, CaptureProfile profile)
+    {
+        if (types.Count == 0) return null;
+
+        // Always prefer 1920×1080 @ ≥55fps if available — it's the standard
+        // target for 1080p60 console capture.  Only fall back to other
+        // resolutions when the device doesn't expose that mode at all.
+        var target1080p60 = types
+            .Where(t => t.Width == 1920 && t.Height == 1080 && t.Fps >= 55)
+            .ToList();
+        IReadOnlyList<NativeStreamInfo> pool = target1080p60.Count > 0
+            ? target1080p60
+            : types;
+
+        return profile switch
+        {
+            CaptureProfile.LowLatency =>
+                pool.OrderByDescending(t => t.Fps)
+                    .ThenByDescending(t => (long)t.Width * t.Height)
+                    .First(),
+
+            CaptureProfile.Quality =>
+                PreferUncompressed(pool, t => ((long)t.Width * t.Height, (long)t.Fps)),
+
+            _ => // Balanced
+                PreferUncompressed(pool, t => ((long)t.Width * t.Height * t.Fps, 0L)),
+        };
+    }
+
+    private static NativeStreamInfo PreferUncompressed(
+        IReadOnlyList<NativeStreamInfo> types,
+        Func<NativeStreamInfo, (long primary, long secondary)> order)
+    {
+        var uncompressed = types.Where(t => !t.IsCompressed).ToList();
+        var pool = uncompressed.Count > 0 ? uncompressed : types.ToList();
+        return pool.OrderByDescending(t => order(t).primary)
+                   .ThenByDescending(t => order(t).secondary)
+                   .First();
+    }
+
+    private static string FormatName(Guid subtype)
+    {
+        if (subtype == MFGuids.VideoFormatMjpeg) return "MJPEG";
+        if (subtype == MFGuids.VideoFormatYuy2)  return "YUY2";
+        if (subtype == MFGuids.VideoFormatNv12)  return "NV12";
+        if (subtype == MFGuids.VideoFormatRgb32) return "RGB32";
+        // FourCC fallback: first 4 bytes of GUID data1
+        var b = subtype.ToByteArray();
+        return $"{(char)b[0]}{(char)b[1]}{(char)b[2]}{(char)b[3]}";
+    }
+
+    private static bool IsCompressedFormat(Guid subtype) =>
+        subtype == MFGuids.VideoFormatMjpeg;
 
     private void HandleDisconnect()
     {

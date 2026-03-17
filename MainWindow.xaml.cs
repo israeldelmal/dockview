@@ -62,11 +62,15 @@ public partial class MainWindow : Window
         _savedWidth  = Width;
         _savedHeight = Height;
 
-        // Borderless fullscreen — no SetWindowPos needed; WPF handles it
-        WindowStyle   = WindowStyle.None;
-        ResizeMode    = ResizeMode.NoResize;
-        WindowState   = WindowState.Normal;   // reset first to re-apply maximise
-        WindowState   = WindowState.Maximized;
+        // True fullscreen: cover the entire screen including taskbar
+        WindowStyle  = WindowStyle.None;
+        ResizeMode   = ResizeMode.NoResize;
+        WindowState  = WindowState.Normal;
+        Topmost      = true;
+        Left         = 0;
+        Top          = 0;
+        Width        = SystemParameters.PrimaryScreenWidth;
+        Height       = SystemParameters.PrimaryScreenHeight;
 
         _isFullscreen = true;
         _hideTimer.Start();
@@ -78,6 +82,7 @@ public partial class MainWindow : Window
         _hideTimer.Stop();
         SetControlsVisible(true);
 
+        Topmost      = false;
         WindowState  = _savedState;
         WindowStyle  = _savedStyle;
         ResizeMode   = _savedResize;

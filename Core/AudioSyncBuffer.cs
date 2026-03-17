@@ -27,6 +27,8 @@ public sealed class AudioSyncBuffer : IWaveProvider, IDisposable
     private readonly object        _lock = new();
 
     private int _pendingDelaySamples; // silence still to inject at start of stream
+    private int _driftDiscard;        // bytes to silently drop from source (clock running fast)
+    private int _driftInject;         // bytes of silence to inject (clock running slow)
 
     public WaveFormat WaveFormat => _source.WaveFormat;
 
@@ -73,6 +75,12 @@ public sealed class AudioSyncBuffer : IWaveProvider, IDisposable
         }
     }
 
+    /// <summary>Schedules a small discard to correct forward drift (buffer growing).</summary>
+    public void DriftDiscard(int bytes) { lock (_lock) _driftDiscard += bytes; }
+
+    /// <summary>Schedules a small silence injection to correct backward drift (buffer shrinking).</summary>
+    public void DriftInject(int bytes) { lock (_lock) _driftInject += bytes; }
+
     public int Read(byte[] buffer, int offset, int count)
     {
         lock (_lock)
@@ -90,7 +98,33 @@ public sealed class AudioSyncBuffer : IWaveProvider, IDisposable
                 count                -= silenceBytes;
             }
 
-            // 2. Pass through from source
+            // 2. Drift correction — discard a few source bytes (forward drift)
+            if (_driftDiscard > 0)
+            {
+                int toDiscard = (Math.Min(_driftDiscard, 4096) / WaveFormat.BlockAlign) * WaveFormat.BlockAlign;
+                if (toDiscard > 0)
+                {
+                    var trash = new byte[toDiscard];
+                    int discarded = _source.Read(trash, 0, toDiscard);
+                    _driftDiscard -= discarded;
+                }
+            }
+
+            // 3. Drift correction — inject silence (backward drift)
+            if (_driftInject > 0 && count > 0)
+            {
+                int toInject = (Math.Min(_driftInject, count) / WaveFormat.BlockAlign) * WaveFormat.BlockAlign;
+                if (toInject > 0)
+                {
+                    Array.Clear(buffer, offset, toInject);
+                    _driftInject -= toInject;
+                    written      += toInject;
+                    offset       += toInject;
+                    count        -= toInject;
+                }
+            }
+
+            // 4. Pass through from source
             if (count > 0)
             {
                 int read = _source.Read(buffer, offset, count);

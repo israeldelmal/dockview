@@ -329,6 +329,13 @@
                                    HorizontalAlignment="Center"
                                    Visibility="{Binding IsCapturing,
                                        Converter={StaticResource BoolToVisibility}}"/>
+                        <TextBlock Text="{Binding StreamInfoText}"
+                                   FontFamily="Segoe UI Variable, Segoe UI, sans-serif"
+                                   FontSize="9"
+                                   Foreground="#77FFFFFF"
+                                   HorizontalAlignment="Center"
+                                   Visibility="{Binding IsCapturing,
+                                       Converter={StaticResource BoolToVisibility}}"/>
                     </StackPanel>
                 </Border>
 

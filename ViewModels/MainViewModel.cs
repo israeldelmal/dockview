@@ -86,13 +86,20 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         private set => Set(ref _isCapturing, value);
     }
 
-    // ── FPS counter ───────────────────────────────────────────────────────────
+    // ── FPS / stream info ─────────────────────────────────────────────────────
 
     private string _fpsText = string.Empty;
     public string FpsText
     {
         get => _fpsText;
         private set => Set(ref _fpsText, value);
+    }
+
+    private string _streamInfoText = string.Empty;
+    public string StreamInfoText
+    {
+        get => _streamInfoText;
+        private set => Set(ref _streamInfoText, value);
     }
 
     private int _frameCounter;
@@ -123,7 +130,18 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
             Dockview.Services.RenderPreset.Balanced    => Dockview.Services.RenderPreset.Quality,
             _                                          => Dockview.Services.RenderPreset.Performance,
         };
+
+        // Restart video capture so the new capture profile takes effect
+        if (_isCapturing)
+            RestartVideoOnly();
     }
+
+    private Core.CaptureProfile GetCaptureProfile() => _renderPreset switch
+    {
+        Dockview.Services.RenderPreset.Performance => Core.CaptureProfile.LowLatency,
+        Dockview.Services.RenderPreset.Quality     => Core.CaptureProfile.Quality,
+        _                                          => Core.CaptureProfile.Balanced,
+    };
 
     public System.Windows.Media.BitmapScalingMode BitmapScalingMode => _renderPreset switch
     {
@@ -309,7 +327,7 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
 
         try
         {
-            _videoCapture.Start(_selectedVideoDevice.SymbolicLink);
+            _videoCapture.Start(_selectedVideoDevice.SymbolicLink, GetCaptureProfile());
             IsCapturing = true;
             StatusText  = "Live";
         }
@@ -323,6 +341,22 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
         {
             try   { _audioEngine.Start(_selectedAudioDevice.DeviceId); }
             catch { /* audio failure is non-fatal */ }
+        }
+    }
+
+    /// <summary>Restarts only the video capture (e.g. after a preset change). Audio is unaffected.</summary>
+    private void RestartVideoOnly()
+    {
+        if (_selectedVideoDevice is null) return;
+        _videoCapture.Stop();
+        StreamInfoText = string.Empty;
+        try
+        {
+            _videoCapture.Start(_selectedVideoDevice.SymbolicLink, GetCaptureProfile());
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to reopen device: {ex.Message}";
         }
     }
 
@@ -372,9 +406,19 @@ public sealed class MainViewModel : ViewModelBase, IDisposable
     {
         int fps = System.Threading.Interlocked.Exchange(ref _frameCounter, 0);
         if (_isCapturing && _previewBitmap is not null)
+        {
             FpsText = $"{fps} fps · {_previewBitmap.PixelWidth}×{_previewBitmap.PixelHeight}";
+
+            var si = _videoCapture.ActiveStreamInfo;
+            StreamInfoText = si is not null
+                ? $"{si.FormatName}{(si.IsCompressed ? " · compressed" : " · raw")}"
+                : string.Empty;
+        }
         else
-            FpsText = string.Empty;
+        {
+            FpsText        = string.Empty;
+            StreamInfoText = string.Empty;
+        }
     }
 
     private void OnFrameArrived(object? sender, VideoFrame frame)

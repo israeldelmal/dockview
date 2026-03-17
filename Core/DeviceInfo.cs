@@ -1,6 +1,34 @@
 using System;
+using System.Collections.Generic;
 
 namespace Dockview.Core;
+
+/// <summary>
+/// Controls how <see cref="VideoCapture"/> selects the native stream format
+/// when multiple options are available on the device.
+/// </summary>
+public enum CaptureProfile
+{
+    /// <summary>Highest FPS at max resolution, any format (even MJPEG).</summary>
+    LowLatency,
+    /// <summary>Uncompressed (YUY2/NV12) at max resolution; best FPS as tiebreaker.</summary>
+    Balanced,
+    /// <summary>Uncompressed at max resolution regardless of FPS; sharpest image.</summary>
+    Quality,
+}
+
+/// <summary>Describes a single native media type exposed by the capture device.</summary>
+public sealed record NativeStreamInfo(
+    uint   TypeIndex,
+    Guid   SubtypeGuid,
+    string FormatName,
+    int    Width,
+    int    Height,
+    int    Fps,
+    bool   IsCompressed)
+{
+    public string DisplayLabel => $"{FormatName} · {Width}×{Height} · {Fps}fps";
+}
 
 /// <summary>Video capture device discovered via Media Foundation MFEnumDeviceSources.</summary>
 public sealed class VideoCaptureDevice

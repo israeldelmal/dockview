@@ -65,6 +65,22 @@ internal static class MFGuids
     public static readonly Guid MtFrameSize =
         new("1652C33D-D6B2-4012-B834-72030849A37D");
 
+    // MF_MT_FRAME_RATE (UINT64: hi-DWORD=numerator, lo-DWORD=denominator)
+    public static readonly Guid MtFrameRate =
+        new("C459A2E8-3D2C-4E44-B132-FEE5156C7BB0");
+
+    // MFVideoFormat_MJPEG
+    public static readonly Guid VideoFormatMjpeg =
+        new("47504A4D-0000-0010-8000-00AA00389B71");
+
+    // MFVideoFormat_YUY2 (4:2:2 uncompressed)
+    public static readonly Guid VideoFormatYuy2 =
+        new("32595559-0000-0010-8000-00AA00389B71");
+
+    // MFVideoFormat_NV12 (4:2:0 uncompressed planar)
+    public static readonly Guid VideoFormatNv12 =
+        new("3231564E-0000-0010-8000-00AA00389B71");
+
     // First video stream constant for IMFSourceReader
     public const uint FirstVideoStream = 0xFFFFFFFC;
 }
@@ -118,6 +134,11 @@ internal static class MFCom
     //                                            30 GetCount
     //                                            31 GetItemByIndex
     //                                            32 CopyAllItems
+
+    /// <summary>IMFAttributes::GetGUID — slot 10.</summary>
+    public static unsafe int GetGUID(IntPtr p, ref Guid key, out Guid value) =>
+        ((delegate* unmanaged[Stdcall]<IntPtr, ref Guid, out Guid, int>)Slot(p, 10))
+            (p, ref key, out value);
 
     /// <summary>IMFAttributes::GetUINT64 — slot 8.</summary>
     public static unsafe int GetUINT64(IntPtr p, ref Guid key, out ulong value) =>
